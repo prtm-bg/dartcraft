@@ -1,0 +1,26 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Development files
+.dart_tool/
+.packages
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Example backup files
+*_backup.*
+*_old.*
+*.bak
