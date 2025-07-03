@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1]
+
+### Fixed
+- Updated GitHub repository links in README.md and pubspec.yaml to correct repository (prtm-bg/dartcraft)
+
+
 ## [1.0.0]
 
 ### Added
