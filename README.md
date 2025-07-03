@@ -3,6 +3,9 @@
 [![pub package](https://img.shields.io/pub/v/dartcraft.svg)](https://pub.dev/packages/dartcraft)
 [![Dart Version](https://badgen.net/badge/Dart/%3E=3.5.3/blue)](https://dart.dev)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-dartcraft-blue?logo=github)](https://github.com/prtmbg/dartcraft)
+[![GitHub Issues](https://img.shields.io/github/issues/prtmbg/dartcraft)](https://github.com/prtmbg/dartcraft/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/prtmbg/dartcraft)](https://github.com/prtmbg/dartcraft)
 
 A modern, cross-platform Minecraft launcher library for Dart and Flutter applications. Dartcraft provides comprehensive functionality for creating custom Minecraft launchers with support for game installation, version management, user authentication, and launching.
 
@@ -260,8 +263,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you encounter any issues or have questions:
 
 1. Check the [API documentation](https://pub.dev/documentation/dartcraft/latest/)
-2. Search [existing issues](https://github.com/yourusername/dartcraft/issues)
-3. Create a [new issue](https://github.com/yourusername/dartcraft/issues/new) if needed
+2. Search [existing issues](https://github.com/prtmbg/dartcraft/issues)
+3. Create a [new issue](https://github.com/prtmbg/dartcraft/issues/new) if needed
+4. Visit the [GitHub repository](https://github.com/prtmbg/dartcraft) for source code and updates
 
 ## Acknowledgments
 

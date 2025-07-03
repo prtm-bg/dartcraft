@@ -1,8 +1,8 @@
 name: dartcraft
 description: A modern, cross-platform Minecraft launcher library for Dart and Flutter applications. Supports game installation, version management, user authentication, and launching.
 version: 1.0.0
-repository: https://github.com/yourusername/dartcraft
-issue_tracker: https://github.com/yourusername/dartcraft/issues
+repository: https://github.com/prtmbg/dartcraft
+issue_tracker: https://github.com/prtmbg/dartcraft/issues
 documentation: https://pub.dev/documentation/dartcraft
 
 environment:
@@ -28,4 +28,4 @@ topics:
   - authentication
 
 funding:
-  - https://github.com/sponsors/yourusername
+  - https://github.com/sponsors/prtmbg
