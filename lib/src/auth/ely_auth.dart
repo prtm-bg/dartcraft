@@ -7,11 +7,46 @@ import 'package:path/path.dart' as path;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
-/// Exception for Ely.by authentication errors
+/// Exception thrown during Ely.by authentication operations
+/// 
+/// Contains specific error codes and messages to help diagnose authentication issues.
+/// 
+/// Common error codes:
+/// - `invalid_client` - Invalid client ID or secret
+/// - `invalid_grant` - Invalid authorization code or refresh token
+/// - `access_denied` - User denied access during OAuth flow
+/// - `BrowserLaunchFailed` - Cannot open browser for authentication
+/// - `AuthTimeout` - User didn't complete authentication within timeout
+/// - `StateMismatch` - OAuth state parameter validation failed
+/// - `TwoFactorRequired` - Account requires two-factor authentication
+/// 
+/// Example:
+/// ```dart
+/// try {
+///   final result = await ElyAuth.authenticateWithOAuth(config);
+/// } catch (e) {
+///   if (e is ElyAuthException) {
+///     switch (e.error) {
+///       case 'access_denied':
+///         print('User cancelled authentication');
+///         break;
+///       case 'invalid_client':
+///         print('Check your client ID and secret');
+///         break;
+///       default:
+///         print('Authentication error: ${e.errorMessage}');
+///     }
+///   }
+/// }
+/// ```
 class ElyAuthException implements Exception {
+  /// Specific error code identifying the type of authentication failure
   final String error;
+  
+  /// Human-readable error message describing the failure
   final String errorMessage;
   
+  /// Creates an authentication exception with error code and message
   ElyAuthException(this.error, this.errorMessage);
   
   @override
@@ -19,12 +54,43 @@ class ElyAuthException implements Exception {
 }
 
 /// Configuration for Ely.by OAuth2 authentication
+/// 
+/// Contains the application credentials and settings required for OAuth2 flow.
+/// Register your application at https://account.ely.by/dev/applications/new
+/// to get the client ID and secret.
+/// 
+/// Example:
+/// ```dart
+/// const config = ElyOAuthConfig(
+///   clientId: 'my-launcher-app',
+///   clientSecret: 'abc123...',
+///   redirectUri: 'http://localhost:8080/callback',
+///   scope: 'account_info minecraft_server_session',
+/// );
+/// ```
 class ElyOAuthConfig {
+  /// OAuth2 client ID from your registered Ely.by application
   final String clientId;
+  
+  /// OAuth2 client secret from your registered Ely.by application
   final String clientSecret;
+  
+  /// Redirect URI where the OAuth callback will be received
+  /// Must match the URI registered in your Ely.by application
   final String redirectUri;
+  
+  /// OAuth2 scopes to request access for
+  /// - `account_info`: Access to user profile information
+  /// - `minecraft_server_session`: Access to Minecraft session tokens
   final String scope;
   
+  /// Creates OAuth2 configuration for Ely.by authentication
+  /// 
+  /// [clientId] and [clientSecret] are required and obtained from your
+  /// registered application at https://account.ely.by/dev/applications/new
+  /// 
+  /// [redirectUri] defaults to localhost:8080 but can be customized
+  /// [scope] defaults to account info and Minecraft session access
   const ElyOAuthConfig({
     required this.clientId,
     required this.clientSecret,
@@ -33,15 +99,41 @@ class ElyOAuthConfig {
   });
 }
 
-/// OAuth2 access token response
+/// OAuth2 access token and metadata
+/// 
+/// Contains the access token, refresh token, and expiration information
+/// returned from a successful OAuth2 authentication or token refresh.
+/// 
+/// Example:
+/// ```dart
+/// final token = ElyOAuthToken.fromJson(response);
+/// 
+/// if (token.isExpired) {
+///   print('Token expired, need to refresh');
+/// } else {
+///   print('Token valid for ${token.expiresAt.difference(DateTime.now()).inMinutes} minutes');
+/// }
+/// ```
 class ElyOAuthToken {
+  /// The access token used for authenticated API requests
   final String accessToken;
+  
+  /// The refresh token used to obtain new access tokens
   final String refreshToken;
+  
+  /// Token type, typically "Bearer"
   final String tokenType;
+  
+  /// Token lifetime in seconds from when it was issued
   final int expiresIn;
+  
+  /// OAuth2 scopes granted to this token
   final String scope;
+  
+  /// Calculated expiration timestamp
   final DateTime expiresAt;
   
+  /// Creates an OAuth2 token with the specified values
   ElyOAuthToken({
     required this.accessToken,
     required this.refreshToken,
@@ -50,6 +142,7 @@ class ElyOAuthToken {
     required this.scope,
   }) : expiresAt = DateTime.now().add(Duration(seconds: expiresIn));
   
+  /// Creates an OAuth2 token from a JSON response
   factory ElyOAuthToken.fromJson(Map<String, dynamic> json) {
     return ElyOAuthToken(
       accessToken: json['access_token'],
@@ -60,19 +153,45 @@ class ElyOAuthToken {
     );
   }
   
+  /// Whether this token has expired and needs to be refreshed
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }
 
-/// Ely.by user information
+/// Ely.by user account information
+/// 
+/// Contains user profile data retrieved from the Ely.by API after
+/// successful OAuth2 authentication.
+/// 
+/// Example:
+/// ```dart
+/// final user = await ElyAuth.getUserInfo(token);
+/// print('Welcome, ${user.username}!');
+/// print('Email: ${user.email}');
+/// print('Profile: ${user.profileLink}');
+/// ```
 class ElyUser {
+  /// Unique user identifier on Ely.by
   final String id;
+  
+  /// User's display name (username)
   final String username;
+  
+  /// User's email address
   final String email;
+  
+  /// User's preferred language code (optional)
   final String? lang;
+  
+  /// URL to user's Ely.by profile page (optional)
   final String? profileLink;
+  
+  /// User's preferred language for interface (optional)
   final String? preferredLanguage;
+  
+  /// Additional user properties and metadata (optional)
   final Map<String, dynamic>? properties;
   
+  /// Creates an Ely.by user object with the specified information
   ElyUser({
     required this.id,
     required this.username,
@@ -83,6 +202,7 @@ class ElyUser {
     this.properties,
   });
   
+  /// Creates an Ely.by user from JSON API response
   factory ElyUser.fromJson(Map<String, dynamic> json) {
     return ElyUser(
       id: json['id'],
@@ -96,14 +216,48 @@ class ElyUser {
   }
 }
 
-/// Result of OAuth2 authentication process
+/// Complete result of OAuth2 authentication process
+/// 
+/// Contains all information needed to launch Minecraft with Ely.by authentication,
+/// including OAuth tokens, user information, and Minecraft session details.
+/// 
+/// Example:
+/// ```dart
+/// final result = await ElyAuth.authenticateWithOAuth(config);
+/// 
+/// // Access user information
+/// print('Authenticated as: ${result.user.username}');
+/// print('Email: ${result.user.email}');
+/// 
+/// // Launch Minecraft with authentication
+/// await launcher.launch(
+///   username: result.minecraftUsername,
+///   uuid: result.minecraftUuid,
+///   accessToken: result.minecraftAccessToken,
+/// );
+/// 
+/// // Token management
+/// if (result.token.isExpired) {
+///   final newToken = await ElyAuth.refreshOAuthToken(config, result.token.refreshToken);
+/// }
+/// ```
 class ElyAuthResult {
+  /// OAuth2 token with access and refresh tokens
   final ElyOAuthToken token;
+  
+  /// User account information from Ely.by
   final ElyUser user;
+  
+  /// Minecraft access token for game authentication
   final String minecraftAccessToken;
+  
+  /// Minecraft username for the authenticated user
   final String minecraftUsername;
+  
+  /// Minecraft UUID for the authenticated user
   final String minecraftUuid;
   
+  /// Creates a complete authentication result
   ElyAuthResult({
     required this.token,
     required this.user,
@@ -113,7 +267,17 @@ class ElyAuthResult {
   });
 }
 
-/// Handles Ely.by authentication for Minecraft
+/// Comprehensive Ely.by authentication handler
+/// 
+/// Provides multiple authentication methods for Ely.by accounts:
+/// - OAuth2 browser-based flow (recommended)
+/// - Username/password authentication
+/// - Two-factor authentication support
+/// - Token management and refresh
+/// - Authlib-injector integration
+/// 
+/// Ely.by is a popular alternative authentication service for Minecraft
+/// that allows custom skins and usernames without requiring a Microsoft account.
 class ElyAuth {
   static const String _authServerUrl = 'https://authserver.ely.by';
   static const String _authlibInjectorUrl = 'https://github.com/yushijinhun/authlib-injector/releases/latest/download/authlib-injector.jar';
@@ -125,7 +289,58 @@ class ElyAuth {
   static const String _oauthUserInfoUrl = '$_oauthBaseUrl/api/account/v1/info';
   static const String _minecraftSessionUrl = '$_oauthBaseUrl/api/minecraft/session/join';
   
-  /// Authenticate using OAuth2 browser flow
+  /// Authenticates a user with Ely.by using OAuth2 browser flow (recommended)
+  /// 
+  /// Opens the user's default browser for secure authentication and handles
+  /// the OAuth2 callback automatically. Uses PKCE (Proof Key for Code Exchange)
+  /// for enhanced security.
+  /// 
+  /// This is the recommended authentication method as it:
+  /// - Does not require storing user credentials
+  /// - Supports two-factor authentication automatically
+  /// - Uses modern OAuth2 security practices
+  /// - Provides refresh tokens for long-term authentication
+  /// 
+  /// Parameters:
+  /// - [config] - OAuth2 configuration with your registered application details
+  /// 
+  /// Example:
+  /// ```dart
+  /// // First, register your app at https://account.ely.by/dev/applications/new
+  /// const config = ElyOAuthConfig(
+  ///   clientId: 'your-client-id',
+  ///   clientSecret: 'your-client-secret',
+  ///   redirectUri: 'http://localhost:8080/callback',
+  ///   scope: 'account_info minecraft_server_session',
+  /// );
+  /// 
+  /// try {
+  ///   print('Opening browser for authentication...');
+  ///   final result = await ElyAuth.authenticateWithOAuth(config);
+  ///   
+  ///   print('✅ Authenticated as: ${result.user.username}');
+  ///   print('Minecraft Username: ${result.minecraftUsername}');
+  ///   
+  ///   // Use the result for Minecraft launcher
+  ///   await launcher.launch(
+  ///     username: result.minecraftUsername,
+  ///     uuid: result.minecraftUuid,
+  ///     accessToken: result.minecraftAccessToken,
+  ///   );
+  /// } catch (e) {
+  ///   print('Authentication failed: $e');
+  /// }
+  /// ```
+  /// 
+  /// Returns [ElyAuthResult] containing user information, OAuth tokens,
+  /// and Minecraft session details.
+  /// 
+  /// Throws [ElyAuthException] with specific error codes:
+  /// - `BrowserLaunchFailed` - Cannot open browser
+  /// - `AuthTimeout` - User didn't complete auth within 5 minutes
+  /// - `StateMismatch` - Security validation failed
+  /// - `access_denied` - User denied access
+  /// - Network-related errors for connection issues
   static Future<ElyAuthResult> authenticateWithOAuth(ElyOAuthConfig config) async {
     // Generate PKCE parameters for security
     final String codeVerifier = _generateCodeVerifier();
@@ -176,7 +391,38 @@ class ElyAuth {
     }
   }
   
-  /// Refresh OAuth2 token
+  /// Refreshes an expired OAuth2 access token using a refresh token
+  /// 
+  /// Use this to obtain a new access token when the current one expires,
+  /// without requiring the user to re-authenticate in the browser.
+  /// 
+  /// Parameters:
+  /// - [config] - OAuth2 configuration with your application credentials
+  /// - [refreshToken] - The refresh token from a previous authentication
+  /// 
+  /// Example:
+  /// ```dart
+  /// // Check if token is expired and refresh if needed
+  /// if (savedToken.isExpired) {
+  ///   try {
+  ///     final newToken = await ElyAuth.refreshOAuthToken(config, savedToken.refreshToken);
+  ///     print('✅ Token refreshed successfully');
+  ///     
+  ///     // Save the new token for future use
+  ///     await saveTokenToStorage(newToken);
+  ///     
+  ///     return newToken;
+  ///   } catch (e) {
+  ///     print('❌ Token refresh failed, need to re-authenticate');
+  ///     // Fall back to full OAuth flow
+  ///     return await ElyAuth.authenticateWithOAuth(config);
+  ///   }
+  /// }
+  /// ```
+  /// 
+  /// Returns a new [ElyOAuthToken] with updated access token and expiration.
+  /// 
+  /// Throws [ElyAuthException] if the refresh token is invalid or expired.
   static Future<ElyOAuthToken> refreshOAuthToken(ElyOAuthConfig config, String refreshToken) async {
     final response = await http.post(
       Uri.parse(_oauthTokenUrl),

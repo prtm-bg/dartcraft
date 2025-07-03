@@ -66,13 +66,35 @@ class Dartcraft {
     debugCallback?.call(message);
   }
 
-  /// Check if the specified Minecraft version is installed
+  /// Whether the Minecraft version is already installed
+  /// 
+  /// Returns `true` if all required files for the specified version exist,
+  /// `false` otherwise.
   bool get isInstalled => _isVersionInstalled(version, installDirectory);
 
-  /// Install the Minecraft version
+  /// Installs the specified Minecraft version
   /// 
-  /// Downloads the game files, libraries, assets, and native libraries
-  /// required to run the specified Minecraft version.
+  /// Downloads and installs all required components for the Minecraft version:
+  /// - Version manifest and metadata
+  /// - Game JAR file with SHA1 verification
+  /// - Required libraries and dependencies
+  /// - Game assets (textures, sounds, etc.)
+  /// - Native libraries for the current platform
+  /// - Logging configuration
+  /// 
+  /// Example:
+  /// ```dart
+  /// final launcher = Dartcraft('1.20.4', '/minecraft');
+  /// 
+  /// if (!launcher.isInstalled) {
+  ///   print('Installing Minecraft...');
+  ///   await launcher.install();
+  ///   print('Installation complete!');
+  /// }
+  /// ```
+  /// 
+  /// Throws [InstallationException] if the version is not found or installation fails.
+  /// Throws [NetworkException] if network requests fail.
   Future<void> install() async {
     if (isInstalled) {
       _debug('Minecraft $version is already installed');
@@ -128,17 +150,46 @@ class Dartcraft {
     }
   }
 
-  /// Launch Minecraft with the specified authentication details
+  /// Launches Minecraft with the specified authentication details
   /// 
-  /// [username] - Player username
-  /// [uuid] - Player UUID
-  /// [accessToken] - Authentication access token
-  /// [javaExecutable] - Optional custom Java executable
-  /// [jvmArguments] - Optional JVM arguments
-  /// [gameArguments] - Optional additional game arguments
-  /// [showOutput] - Whether to display game output in console
+  /// Starts a new Minecraft process with the provided authentication information.
+  /// The game must be installed first using [install()].
   /// 
-  /// Returns a [Process] object for the running Minecraft instance
+  /// Parameters:
+  /// - [username] - Player's display name in-game
+  /// - [uuid] - Player's unique identifier (with or without dashes)
+  /// - [accessToken] - Valid authentication token from Microsoft or Ely.by
+  /// - [javaExecutable] - Optional custom Java executable path
+  /// - [jvmArguments] - Optional JVM arguments (e.g., `-Xmx2G` for memory)
+  /// - [gameArguments] - Optional additional game arguments
+  /// - [showOutput] - Whether to display game output in console (default: true)
+  /// 
+  /// Example:
+  /// ```dart
+  /// final launcher = Dartcraft('1.20.4', '/minecraft');
+  /// 
+  /// // Ensure game is installed
+  /// if (!launcher.isInstalled) {
+  ///   await launcher.install();
+  /// }
+  /// 
+  /// // Launch with authentication
+  /// final process = await launcher.launch(
+  ///   username: 'PlayerName',
+  ///   uuid: '12345678-1234-1234-1234-123456789abc',
+  ///   accessToken: 'your-access-token',
+  ///   jvmArguments: ['-Xmx2G', '-Xms1G'],
+  /// );
+  /// 
+  /// // Wait for game to exit
+  /// final exitCode = await process.exitCode;
+  /// print('Game exited with code: $exitCode');
+  /// ```
+  /// 
+  /// Returns a [Process] object representing the running Minecraft instance.
+  /// 
+  /// Throws [LaunchException] if the game is not installed or launch fails.
+  /// Throws [ValidationException] if authentication details are invalid.
   Future<Process> launch({
     required String username,
     required String uuid,
@@ -197,7 +248,24 @@ class Dartcraft {
     }
   }
 
-  /// Get a list of available Minecraft versions
+  /// Gets a list of all available Minecraft versions
+  /// 
+  /// Fetches the complete version manifest from Mojang's servers, including
+  /// releases, snapshots, and other experimental versions.
+  /// 
+  /// Example:
+  /// ```dart
+  /// final versions = await Dartcraft.getAvailableVersions();
+  /// 
+  /// print('Available versions:');
+  /// for (final version in versions.take(10)) {
+  ///   print('${version.id} (${version.type}) - ${version.releaseTime}');
+  /// }
+  /// ```
+  /// 
+  /// Returns a list of [MinecraftVersion] objects sorted by release date.
+  /// 
+  /// Throws [DartcraftException] if the version manifest cannot be fetched.
   static Future<List<MinecraftVersion>> getAvailableVersions() async {
     try {
       final manifest = await _fetchVersionManifest();
@@ -210,7 +278,28 @@ class Dartcraft {
     }
   }
 
-  /// Get release versions only
+  /// Gets a list of stable Minecraft release versions only
+  /// 
+  /// Filters the available versions to include only stable releases,
+  /// excluding snapshots, alpha, beta, and other experimental versions.
+  /// 
+  /// Example:
+  /// ```dart
+  /// final releases = await Dartcraft.getReleaseVersions();
+  /// 
+  /// print('Stable releases:');
+  /// for (final version in releases.take(5)) {
+  ///   print('${version.id} - Released: ${version.releaseTime}');
+  /// }
+  /// 
+  /// // Use the latest release
+  /// final latest = releases.first;
+  /// final launcher = Dartcraft(latest.id, '/minecraft');
+  /// ```
+  /// 
+  /// Returns a list of [MinecraftVersion] objects for stable releases only.
+  /// 
+  /// Throws [DartcraftException] if the version manifest cannot be fetched.
   static Future<List<MinecraftVersion>> getReleaseVersions() async {
     final versions = await getAvailableVersions();
     return versions.where((v) => v.type == VersionType.release).toList();
@@ -233,11 +322,36 @@ class Dartcraft {
     return MicrosoftAuth.getAuthorizationUrl();
   }
 
-  /// Authenticate with Ely.by account
+  /// Authenticates with Ely.by using username and password
   /// 
-  /// [username] - Ely.by username or email
-  /// [password] - Account password
-  /// Returns authentication result with user details and tokens
+  /// Provides username/password authentication for Ely.by accounts.
+  /// For OAuth2 browser-based authentication, use [ElyAuth.authenticateWithOAuth] directly.
+  /// 
+  /// Parameters:
+  /// - [username] - Ely.by username or email address
+  /// - [password] - Account password
+  /// 
+  /// Example:
+  /// ```dart
+  /// final launcher = Dartcraft('1.20.4', '/minecraft', useElyBy: true);
+  /// 
+  /// try {
+  ///   final auth = await launcher.authenticateWithElyBy('username', 'password');
+  ///   
+  ///   await launcher.launch(
+  ///     username: auth.username,
+  ///     uuid: auth.uuid,
+  ///     accessToken: auth.accessToken,
+  ///   );
+  /// } catch (e) {
+  ///   print('Authentication failed: $e');
+  /// }
+  /// ```
+  /// 
+  /// Returns [AuthenticationResult] with user details and access tokens.
+  /// 
+  /// Throws [TwoFactorRequiredException] if 2FA is required for the account.
+  /// Throws [AuthenticationException] if credentials are invalid.
   Future<AuthenticationResult> authenticateWithElyBy(
     String username,
     String password,
@@ -253,12 +367,39 @@ class Dartcraft {
     }
   }
 
-  /// Authenticate with Ely.by account using two-factor authentication
+  /// Authenticates with Ely.by using two-factor authentication
   /// 
-  /// [username] - Ely.by username or email
-  /// [password] - Account password
-  /// [twoFactorCode] - Two-factor authentication code
-  /// Returns authentication result with user details and tokens
+  /// Use this method when your Ely.by account has two-factor authentication enabled.
+  /// 
+  /// Parameters:
+  /// - [username] - Ely.by username or email address
+  /// - [password] - Account password
+  /// - [twoFactorCode] - Current 6-digit 2FA code from your authenticator app
+  /// 
+  /// Example:
+  /// ```dart
+  /// final launcher = Dartcraft('1.20.4', '/minecraft', useElyBy: true);
+  /// 
+  /// try {
+  ///   final auth = await launcher.authenticateWithElyByTwoFactor(
+  ///     'username', 
+  ///     'password', 
+  ///     '123456'
+  ///   );
+  ///   
+  ///   await launcher.launch(
+  ///     username: auth.username,
+  ///     uuid: auth.uuid,
+  ///     accessToken: auth.accessToken,
+  ///   );
+  /// } catch (e) {
+  ///   print('Authentication failed: $e');
+  /// }
+  /// ```
+  /// 
+  /// Returns [AuthenticationResult] with user details and access tokens.
+  /// 
+  /// Throws [AuthenticationException] if credentials or 2FA code are invalid.
   Future<AuthenticationResult> authenticateWithElyByTwoFactor(
     String username,
     String password,
