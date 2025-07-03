@@ -1,8 +1,9 @@
-/// Support for doing something awesome.
+/// A Minecraft Launcher Library in Dart
 ///
-/// More dartdocs go here.
-library;
+/// This library provides functionality to install and launch Minecraft,
+/// similar to Python's minecraft-launcher-lib.
+library dartcraft;
 
 export 'src/dartcraft_base.dart';
-
-// TODO: Export any libraries intended for clients of this package.
+export 'src/dartcraft_exceptions.dart';
+export 'src/minecraft_auth.dart';
