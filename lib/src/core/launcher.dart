@@ -9,6 +9,9 @@ import '../exceptions/exceptions.dart';
 import '../auth/microsoft_auth.dart';
 import '../auth/ely_auth.dart';
 
+/// Callback function for debug output and progress reporting
+typedef DebugCallback = void Function(String message);
+
 /// Main Dartcraft launcher class
 /// 
 /// Provides comprehensive functionality for installing and launching Minecraft
@@ -29,6 +32,9 @@ class Dartcraft {
   /// Optional path to authlib-injector for Ely.by authentication
   String? authlibInjectorPath;
 
+  /// Optional debug callback for progress reporting
+  final DebugCallback? debugCallback;
+
   /// Creates a new Dartcraft launcher instance
   /// 
   /// [version] - The Minecraft version to manage (e.g., '1.20.4')
@@ -36,20 +42,28 @@ class Dartcraft {
   /// [javaPath] - Optional custom Java executable path
   /// [useElyBy] - Whether to enable Ely.by authentication support
   /// [authlibInjectorPath] - Optional path to authlib-injector JAR file
+  /// [debugCallback] - Optional callback for debug output and progress reporting
   Dartcraft(
     this.version,
     this.installDirectory, {
     this.javaPath,
     this.useElyBy = false,
     this.authlibInjectorPath,
+    this.debugCallback,
   });
 
   /// Convenience constructor for testing with default settings
-  factory Dartcraft.testing() {
+  factory Dartcraft.testing({DebugCallback? debugCallback}) {
     return Dartcraft(
       '1.20.4',
       path.join(Directory.current.path, 'minecraft_test'),
+      debugCallback: debugCallback,
     );
+  }
+
+  /// Send debug message if callback is provided
+  void _debug(String message) {
+    debugCallback?.call(message);
   }
 
   /// Check if the specified Minecraft version is installed
@@ -61,10 +75,14 @@ class Dartcraft {
   /// required to run the specified Minecraft version.
   Future<void> install() async {
     if (isInstalled) {
+      _debug('Minecraft $version is already installed');
       return;
     }
 
+    _debug('Starting installation of Minecraft $version...');
+
     try {
+      _debug('Fetching version manifest...');
       final versionManifest = await _fetchVersionManifest();
       final versionInfo = _findVersionInManifest(versionManifest, version);
       
@@ -72,28 +90,40 @@ class Dartcraft {
         throw InstallationException('Version $version not found');
       }
 
+      _debug('Found version $version in manifest');
+
       // Download and save version JSON
+      _debug('Downloading version data...');
       final versionData = await _downloadVersionData(versionInfo);
       
       // Handle version inheritance for modded versions
+      _debug('Processing version inheritance...');
       final processedVersionData = await _processVersionInheritance(versionData);
       
       // Download client JAR
+      _debug('Downloading client JAR...');
       await _downloadClientJar(processedVersionData);
       
       // Install libraries
+      _debug('Installing libraries...');
       await _installLibraries(processedVersionData);
       
       // Extract native libraries
+      _debug('Extracting native libraries...');
       await _extractNativeLibraries(processedVersionData);
       
       // Install assets
+      _debug('Installing game assets...');
       await _installAssets(processedVersionData);
       
       // Install logging configuration
+      _debug('Installing logging configuration...');
       await _installLoggingConfig(processedVersionData);
 
+      _debug('Minecraft $version installation completed successfully!');
+
     } catch (e) {
+      _debug('Installation failed: $e');
       throw InstallationException('Failed to install Minecraft $version: $e');
     }
   }
@@ -122,13 +152,18 @@ class Dartcraft {
       throw LaunchException('Minecraft $version is not installed. Call install() first.');
     }
 
+    _debug('Starting launch process for Minecraft $version...');
+    _debug('Player: $username (UUID: $uuid)');
+
     try {
       // Setup Ely.by authentication if needed
       if (useElyBy) {
+        _debug('Setting up Ely.by authentication...');
         await _setupElyByAuthentication();
       }
 
       // Build launch command
+      _debug('Building launch command...');
       final command = await _buildLaunchCommand(
         username: username,
         uuid: uuid,
@@ -138,7 +173,10 @@ class Dartcraft {
         gameArguments: gameArguments,
       );
 
+      _debug('Launch command built successfully');
+
       // Start the process
+      _debug('Starting Minecraft process...');
       final process = await Process.start(
         command.first,
         command.skip(1).toList(),
@@ -146,12 +184,15 @@ class Dartcraft {
         runInShell: Platform.isWindows,
       );
 
+      _debug('Minecraft process started successfully (PID: ${process.pid})');
+
       if (showOutput) {
         _setupProcessOutput(process);
       }
 
       return process;
     } catch (e) {
+      _debug('Launch failed: $e');
       throw LaunchException('Failed to launch Minecraft: $e');
     }
   }
@@ -357,25 +398,47 @@ class Dartcraft {
       final existingBytes = await file.readAsBytes();
       final existingSha1 = sha1.convert(existingBytes).toString();
       if (existingSha1 == expectedSha1) {
+        _debug('File already exists and verified: ${path.basename(filePath)}');
         return; // File is already valid
       }
+      _debug('File exists but SHA1 mismatch, re-downloading: ${path.basename(filePath)}');
     }
 
-    // Download the file
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode != 200) {
-      throw InstallationException('Failed to download file: $url');
-    }
+    _debug('Downloading: ${path.basename(filePath)}');
 
-    // Verify SHA1
-    final actualSha1 = sha1.convert(response.bodyBytes).toString();
-    if (actualSha1 != expectedSha1) {
-      throw InstallationException('File verification failed: $filePath');
-    }
+    // Download the file with retry logic
+    const maxRetries = 3;
+    for (int retry = 0; retry < maxRetries; retry++) {
+      try {
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode != 200) {
+          throw InstallationException('Failed to download file (HTTP ${response.statusCode}): $url');
+        }
 
-    // Save the file
-    await Directory(path.dirname(filePath)).create(recursive: true);
-    await file.writeAsBytes(response.bodyBytes);
+        // Verify SHA1
+        final actualSha1 = sha1.convert(response.bodyBytes).toString();
+        if (actualSha1 != expectedSha1) {
+          if (retry == maxRetries - 1) {
+            throw InstallationException('File verification failed after $maxRetries attempts: $filePath\nExpected SHA1: $expectedSha1\nActual SHA1: $actualSha1\nURL: $url');
+          }
+          _debug('SHA1 mismatch, retrying download (${retry + 1}/$maxRetries): ${path.basename(filePath)}');
+          continue;
+        }
+
+        // Save the file
+        await Directory(path.dirname(filePath)).create(recursive: true);
+        await file.writeAsBytes(response.bodyBytes);
+        
+        _debug('Successfully downloaded and verified: ${path.basename(filePath)}');
+        return;
+      } catch (e) {
+        if (retry == maxRetries - 1) {
+          throw InstallationException('Failed to download file after $maxRetries attempts: $filePath - $e');
+        }
+        _debug('Download failed, retrying (${retry + 1}/$maxRetries): ${path.basename(filePath)} - $e');
+        await Future.delayed(Duration(milliseconds: 500 * (retry + 1))); // Exponential backoff
+      }
+    }
   }
 
   Future<void> _installLibraries(Map<String, dynamic> versionData) async {
@@ -571,19 +634,30 @@ class Dartcraft {
 
   Future<void> _installLoggingConfig(Map<String, dynamic> versionData) async {
     final logging = versionData['logging'] as Map<String, dynamic>?;
-    if (logging == null) return;
+    if (logging == null) {
+      _debug('No logging configuration found');
+      return;
+    }
 
     final client = logging['client'] as Map<String, dynamic>?;
-    if (client == null) return;
+    if (client == null) {
+      _debug('No client logging configuration found');
+      return;
+    }
 
     final file = client['file'] as Map<String, dynamic>?;
-    if (file == null) return;
+    if (file == null) {
+      _debug('No logging file configuration found');
+      return;
+    }
 
     final url = file['url'] as String;
-    final sha1Hash = file['id'] as String;
+    final sha1Hash = file['sha1'] as String;
     final configPath = path.join(installDirectory, 'assets', 'log_configs', file['id']);
 
+    _debug('Downloading logging config: ${file['id']}');
     await _downloadFileWithVerification(url, configPath, sha1Hash);
+    _debug('Logging configuration installed successfully');
   }
 
   Future<void> _setupElyByAuthentication() async {

@@ -17,6 +17,23 @@ A modern, cross-platform Minecraft launcher library for Dart and Flutter applica
 - 🛡️ **Security**: SHA1 verification for all downloads and secure token management
 - 💾 **Memory Efficient**: Streaming downloads for large files
 
+## Status
+
+### ✅ Fully Implemented & Tested
+- **Ely.by OAuth2 Authentication**: Complete browser-based OAuth2 flow with PKCE security
+- **Cross-platform URL launching**: Works on Windows, macOS, and Linux
+- **Token management**: Automatic refresh and validation
+
+### ⚠️ Implemented but Not Yet Tested
+- **Microsoft Authentication**: OAuth2 flow implementation exists but requires testing
+- **Modded Minecraft Support**: Forge, Fabric, and other mod loaders support exists but needs validation
+- **Java runtime detection**: Automatic Java detection across platforms
+
+### 🚧 Planned Features
+- **Profile management**: Multiple player profiles and configurations
+- **Mod management**: Automatic mod installation and updates
+- **Offline mode**: Cached authentication for offline play
+
 ## Installation
 
 Add this to your package's `pubspec.yaml` file:

@@ -1,8 +1,14 @@
 import 'package:dartcraft/dartcraft.dart';
 
 void main() async {
-  // Create a Dartcraft instance
-  final dartcraft = Dartcraft.testing();
+  // Create a Dartcraft instance with debug output
+  final dartcraft = Dartcraft(
+    '1.20.4', 
+    '/Users/prtmbg/Downloads/minecraft_test',
+    debugCallback: (message) {
+      print('[DARTCRAFT] $message');
+    },
+  );
   
   try {
     // PART 1: Show available Minecraft versions

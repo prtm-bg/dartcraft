@@ -47,4 +47,10 @@ export 'src/exceptions/exceptions.dart';
 
 // Authentication modules
 export 'src/auth/microsoft_auth.dart' show MicrosoftAuth;
-export 'src/auth/ely_auth.dart' show ElyAuth, ElyAuthException;
+export 'src/auth/ely_auth.dart' show 
+    ElyAuth, 
+    ElyAuthException,
+    ElyOAuthConfig,
+    ElyOAuthToken,
+    ElyUser,
+    ElyAuthResult;
