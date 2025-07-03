@@ -4,7 +4,7 @@ void main() async {
   // Create a Dartcraft instance with debug output
   final dartcraft = Dartcraft(
     '1.20.4', 
-    '/Users/prtmbg/Downloads/minecraft_test',
+    '/path/to/minecraft_test',
     debugCallback: (message) {
       print('[DARTCRAFT] $message');
     },
