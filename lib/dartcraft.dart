@@ -85,7 +85,7 @@
 /// ```
 ///
 /// For more examples and detailed documentation, visit:
-/// https://github.com/prtmbg/dartcraft
+/// https://github.com/prtm-bg/dartcraft
 library dartcraft;
 
 // Core launcher functionality
